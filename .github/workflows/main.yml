@@ -10,7 +10,7 @@ env:
   ECR_BACKEND: tienda-backend
   ECR_FRONTEND: tienda-frontend
   ECR_DB: tienda-db
-  CLUSTER_NAME: tienda-eks
+  CLUSTER_NAME: devopseks
   NAMESPACE: tienda
 
 jobs:
