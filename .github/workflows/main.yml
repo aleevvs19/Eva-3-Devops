@@ -1,0 +1,65 @@
+name: CI/CD Tienda Perritos EKS
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  AWS_REGION: us-east-1
+  ECR_BACKEND: tienda-backend
+  ECR_FRONTEND: tienda-frontend
+  ECR_DB: tienda-db
+  CLUSTER_NAME: tienda-eks
+  NAMESPACE: tienda
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar codigo
+        uses: actions/checkout@v4
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login en Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Construir y subir Backend
+        run: |
+          docker build -t $ECR_BACKEND ./deploy-tienda-perritos/backend
+          docker tag $ECR_BACKEND:latest ${{ steps.login-ecr.outputs.registry }}/$ECR_BACKEND:latest
+          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_BACKEND:latest
+
+      - name: Construir y subir Frontend
+        run: |
+          docker build -t $ECR_FRONTEND ./deploy-tienda-perritos/frontend
+          docker tag $ECR_FRONTEND:latest ${{ steps.login-ecr.outputs.registry }}/$ECR_FRONTEND:latest
+          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_FRONTEND:latest
+
+      - name: Construir y subir Base de Datos
+        run: |
+          docker build -t $ECR_DB ./deploy-tienda-perritos/db
+          docker tag $ECR_DB:latest ${{ steps.login-ecr.outputs.registry }}/$ECR_DB:latest
+          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_DB:latest
+
+      - name: Conectar con EKS
+        run: |
+          aws eks update-kubeconfig --region $AWS_REGION --name $CLUSTER_NAME
+
+      - name: Aplicar manifiestos Kubernetes
+        run: |
+          kubectl apply -f ./deploy-tienda-perritos/k8s
+
+      - name: Reiniciar deployments
+        run: |
+          kubectl rollout restart deployment/tienda-backend -n $NAMESPACE
+          kubectl rollout restart deployment/tienda-frontend -n $NAMESPACE
