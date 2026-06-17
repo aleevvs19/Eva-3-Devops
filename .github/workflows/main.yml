@@ -55,6 +55,11 @@ jobs:
         run: |
           aws eks update-kubeconfig --region $AWS_REGION --name $CLUSTER_NAME
 
+      - name: Preparar manifiestos Kubernetes
+        run: |
+          sed -i "s|{{ECR_URL}}|${{ steps.login-ecr.outputs.registry }}|g" ./deploy-tienda-perritos/k8s/*.yaml
+          sed -i "s|:eks-v1|:latest|g" ./deploy-tienda-perritos/k8s/*.yaml
+
       - name: Aplicar manifiestos Kubernetes
         run: |
           kubectl apply -f ./deploy-tienda-perritos/k8s
